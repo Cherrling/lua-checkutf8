@@ -42,6 +42,10 @@ Since this function performs replacement for each byte of the illegal sequences
 instead of their maximal subparts, it isn't compliant with WHATWG Encoding
 Standard, but the Unicode Standard doesn't require such behavior.
 
+## Performance
+
+See [benchmark.md](./benchmark.md) for details.
+
 ## Copyright and License
 
 This project is written by `Yao Zi <me@ziyao.cc>`, and released under Mozilla
