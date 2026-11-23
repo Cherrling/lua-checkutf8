@@ -36,7 +36,7 @@ utf8_validate(const char *str, size_t len)
 		if (p[i] <= 0x7f) {
 			/* [00, 7f] */
 			i++;
-		} else if (p[i] >= 0xc2 && p[i] <= 0xdf) {
+		} else if ((p[i] >= 0xc2) & (p[i] <= 0xdf)) {
 			/* [c2 - df] [80 - bf] */
 			if (len - i < 2)
 				return i;
@@ -45,7 +45,7 @@ utf8_validate(const char *str, size_t len)
 				return i;
 
 			i += 2;
-		} else if (p[i] >= 0xe0 && p[i] <= 0xef) {
+		} else if ((p[i] >= 0xe0) & (p[i] <= 0xef)) {
 			/*
 			 * [e0]     [a0, bf] [80, bf]
 			 * [e1, ec] [80, bf] [80, bf]
@@ -55,17 +55,17 @@ utf8_validate(const char *str, size_t len)
 			if (len - i < 3)
 				return i;
 
-			if (!valid_trailer(p[i + 1]) ||
+			if (!valid_trailer(p[i + 1]) |
 			    !valid_trailer(p[i + 2]))
 				return i;
 
 			// For sequences starting with 0xe0 and 0xed
-			if ((p[i] == 0xe0 && p[i + 1] < 0xa0) ||
-			    (p[i] == 0xed && p[i + 1] > 0x9f))
+			if (((p[i] == 0xe0) & (p[i + 1] < 0xa0)) |
+			    ((p[i] == 0xed) & (p[i + 1] > 0x9f)))
 				return i;
 
 			i += 3;
-		} else if (p[i] >= 0xf0 && p[i] <= 0xf4) {
+		} else if ((p[i] >= 0xf0) & (p[i] <= 0xf4)) {
 			/*
 			 * [f0]     [90, bf] [80, bf] [80, bf]
 			 * [f1, f3] [80, bf] [80, bf] [80, bf]
@@ -74,14 +74,14 @@ utf8_validate(const char *str, size_t len)
 			if (len - i < 4)
 				return i;
 
-			if (!valid_trailer(p[i + 1]) ||
-			    !valid_trailer(p[i + 2]) ||
+			if (!valid_trailer(p[i + 1]) |
+			    !valid_trailer(p[i + 2]) |
 			    !valid_trailer(p[i + 3]))
 				return i;
 
 			// For sequences starting with 0xf0 and 0xf4
-			if ((p[i] == 0xf0 && p[i + 1] < 0x90) ||
-			    (p[i] == 0xf4 && p[i + 1] > 0x8f))
+			if (((p[i] == 0xf0) & (p[i + 1] < 0x90)) |
+			    ((p[i] == 0xf4) & (p[i + 1] > 0x8f)))
 				return i;
 
 			i += 4;
