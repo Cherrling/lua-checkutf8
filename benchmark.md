@@ -53,3 +53,21 @@ by `cat` them together.
 | Pride and Prejudice                      | 0.848 | 0.153 | 0.263 | 0.232 | 0.430 |
 | The Miracles of the Namiya General Store | 0.501 | 0.133 | 0.215 | 0.233 | 0.350 |
 | Transky                                  | 0.484 | 0.132 | 0.212 | 0.230 | 0.344 |
+
+### Wide SIMD comparison on Xeon 6966P-C
+
+Lua 5.4.6, Clang 18.1.3, `-O2`, pinned to one core. Both modules were
+loaded in the same Lua process. Times are medians over nine interleaved rounds
+of calls to `validate` on the same string. The baseline is commit `ab275a6`.
+The test machine supports AVX-512BW.
+
+| Lua input | SSE2 (GiB/s) | Runtime dispatch (GiB/s) |
+| --- | ---: | ---: |
+| `("文"):rep(64)` | 2.94 | 5.50 |
+| `("文"):rep(512)` | 3.89 | 14.92 |
+| `("文"):rep(65536)` | 4.22 | 22.42 |
+| `("🌛😃🚀🌃"):rep(15000)` | 3.80 | 22.31 |
+| `("function hello() return true end\n"):rep(3000)` | 54.68 | 77.72 |
+
+Scanning one 576 MiB string, `("中文段落"):rep(48 * 1024^2)`, yielded
+11.50 GiB/s with runtime dispatch (median of seven rounds).

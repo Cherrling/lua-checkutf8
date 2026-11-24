@@ -101,8 +101,58 @@ utf8_validate_blocks(const char *str, size_t len)
 }
 #endif
 
+#if defined(__SSE2__) && (defined(__x86_64__) || defined(__i386__)) && \
+    ((defined(__GNUC__) && __GNUC__ >= 8) || (defined(__clang_major__) && __clang_major__ >= 8))
+#include <immintrin.h>
+#define HAVE_WIDE_UTF8
+
+/* Lookup algorithm by Keiser and Lemire (doi:10.1002/spe.2920).
+ * Each nibble lookup keeps the rules that can apply at this position.
+ * An intersection identifies an illegal pair, or a pair of trailers whose
+ * validity depends on a lead two or three bytes earlier. */
+enum {
+	MISSING = 1, UNEXPECTED = 2, OVERLONG2 = 4, OVERLONG3 = 8,
+	SURROGATE = 16, ABOVE_MAX = 32, LOW_FOUR = 64, TWO_TRAILERS = 128
+};
+#define COMMON (MISSING | UNEXPECTED | TWO_TRAILERS)
+#define HIGH_F (COMMON | ABOVE_MAX | LOW_FOUR)
+#define CONT (UNEXPECTED | OVERLONG2 | TWO_TRAILERS)
+static const unsigned char prev_high[16] = {
+	UNEXPECTED, UNEXPECTED, UNEXPECTED, UNEXPECTED,
+	UNEXPECTED, UNEXPECTED, UNEXPECTED, UNEXPECTED,
+	TWO_TRAILERS, TWO_TRAILERS, TWO_TRAILERS, TWO_TRAILERS,
+	MISSING | OVERLONG2, MISSING, MISSING | OVERLONG3 | SURROGATE, MISSING | ABOVE_MAX | LOW_FOUR
+};
+static const unsigned char prev_low[16] = {
+	COMMON | OVERLONG2 | OVERLONG3 | LOW_FOUR, COMMON | OVERLONG2, COMMON, COMMON,
+	COMMON | ABOVE_MAX, HIGH_F, HIGH_F, HIGH_F,
+	HIGH_F, HIGH_F, HIGH_F, HIGH_F,
+	HIGH_F, HIGH_F | SURROGATE, HIGH_F, HIGH_F
+};
+static const unsigned char curr_high[16] = {
+	MISSING, MISSING, MISSING, MISSING, MISSING, MISSING, MISSING, MISSING,
+	CONT | OVERLONG3 | LOW_FOUR, CONT | OVERLONG3 | ABOVE_MAX,
+	CONT | SURROGATE | ABOVE_MAX, CONT | SURROGATE | ABOVE_MAX,
+	MISSING, MISSING, MISSING, MISSING
+};
+#undef HIGH_F
+#undef COMMON
+#undef CONT
+
+#define VECTOR_BYTES 32
+#include "checkutf8-wide.h"
+#undef VECTOR_BYTES
+#define VECTOR_BYTES 64
+#include "checkutf8-wide.h"
+#undef VECTOR_BYTES
+#endif
+
+#if defined(HAVE_WIDE_UTF8) && !defined(__clang__)
+/* Keep GCC's short-input loop together, outside the wide dispatcher. */
+__attribute__((flatten, noinline))
+#endif
 static size_t
-utf8_validate(const char *str, size_t len)
+utf8_validate_narrow(const char *str, size_t len)
 {
 #ifdef __SSE2__
 	size_t prefix = len >= 16 ? utf8_validate_blocks(str, len) : 0;
@@ -119,6 +169,25 @@ utf8_validate(const char *str, size_t len)
 
 	return err + utf8_validate_checked(str, len);
 #endif
+}
+
+static size_t
+utf8_validate(const char *str, size_t len)
+{
+#ifdef HAVE_WIDE_UTF8
+	if (len >= 80 && __builtin_cpu_supports("avx2")) {
+		/* A checked prefix supplies lookbehind for the first wide block. */
+		size_t prefix = utf8_validate_blocks(str, 16);
+		if (!prefix)
+			return utf8_validate_checked(str, len);
+		if (len >= 512 && __builtin_cpu_supports("avx512bw"))
+			prefix = utf8_validate_avx512(str, len, prefix);
+		else
+			prefix = utf8_validate_avx2(str, len, prefix);
+		return prefix + utf8_validate_narrow(str + prefix, len - prefix);
+	}
+#endif
+	return utf8_validate_narrow(str, len);
 }
 
 static int
@@ -159,19 +228,35 @@ checkutf8_repair(lua_State *l)
 	luaL_Buffer buff;
 	luaL_buffinit(l, &buff);
 
-	luaL_addlstring(&buff, s, err);
-	luaL_addlstring(&buff, replacement, replacementLen);
-
-	size_t start = err + 1;
-	for (err = utf8_validate(s + start, len - start);
-	     start + err < len;
-	     err = utf8_validate(s + start, len - start)) {
-		luaL_addlstring(&buff, s + start, err);
+	do {
+		if (err)
+			luaL_addlstring(&buff, s, err);
 		luaL_addlstring(&buff, replacement, replacementLen);
-		start += err + 1;
-	}
+		len -= err + 1;
+		s += err + 1;
 
-	luaL_addlstring(&buff, s + start, len - start);
+		/* Skip validation for bytes that cannot start a character. */
+		while (len) {
+			unsigned char lead = (unsigned char)*s;
+			if (lead < 0x80 || (lead >= 0xc2 && lead <= 0xf4))
+				break;
+			luaL_addlstring(&buff, replacement, replacementLen);
+			s++;
+			len--;
+		}
+		/* Nearby errors are common in damaged input. A short probe also
+		 * avoids wide-vector setup for every replacement. The final three
+		 * bytes of the probe can contain a truncated valid character. */
+		if (len >= 16 && err < 16) {
+			err = utf8_validate_checked(s, 16);
+			if (err < 13)
+				continue;
+			err += utf8_validate(s + err, len - err);
+		} else {
+			err = utf8_validate(s, len);
+		}
+	} while (err < len);
+	luaL_addlstring(&buff, s, len);
 
 	luaL_pushresult(&buff);
 

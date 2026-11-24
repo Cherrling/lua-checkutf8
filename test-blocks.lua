@@ -29,3 +29,20 @@ for prefix = 0, 80 do
 		end
 	end
 end
+
+-- Move a sequence through every lane of a four-vector group. Check both
+-- a truncated final character and an error followed by another full group.
+for offset = 0, 255 do
+	local pad = ("a中"):rep(128) .. ("x"):rep(offset)
+	for _, seq in ipairs({
+		"\xc0\x80", "\xc1\xbf", "\xc2\x80", "\xe0\x9f\xbf", "\xe0\xa0\x80",
+		"\xed\x9f\xbf", "\xed\xa0\x80", "\xf0\x8f\xbf\xbf", "\xf0\x90\x80\x80",
+		"\xf4\x8f\xbf\xbf", "\xf4\x90\x80\x80", "\xf5\x80\x80\x80", "\xff",
+	}) do
+		for n = 1, #seq do
+			local s = pad .. seq:sub(1, n)
+			check(s)
+			check(s .. ("a"):rep(256) .. "\xff" .. pad)
+		end
+	end
+end
