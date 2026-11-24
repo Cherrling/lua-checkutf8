@@ -1,5 +1,8 @@
 # Benchmark
 
+The [versioned speed corpus](bench/README.md) replays individual agent, tool,
+length-sweep and malformed-input calls through both Lua APIs.
+
 ## Example Texts
 
 Testing is done with `benchmark.lua` on some real-world texts,
