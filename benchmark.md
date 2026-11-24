@@ -137,3 +137,21 @@ For the all-invalid case, forcing the scalar validator on the same CPU reduced
 repair time from 36.5 to 4.34 µs with Clang and from 36.4 to 4.34 µs with GCC.
 GCC scalar showed regressions for agent-session (90.7 to 96.0 ns), invalid-tail
 (11.2 to 13.3 µs) and one error per 1024 bytes (5.99 to 7.20 µs).
+
+### Copying isolated three-byte replacements
+
+Compared with `b95879e` on Xeon 6966P-C, Lua 5.4.6, core 4, GCC 13 and
+Clang 18 at `-O2`. Both modules replayed the same inputs with the default
+replacement. Times are median µs per Lua `repair` call over seven interleaved
+rounds.
+
+| Input | GCC before → after | Clang before → after |
+| --- | ---: | ---: |
+| Every second byte invalid, 8192 bytes | 42.22 → 35.82 | 43.87 → 33.50 |
+| Every 13th byte invalid, 8190 bytes | 11.29 → 10.42 | 9.35 → 8.72 |
+| Binary corpus | 17.18 → 16.43 | 16.69 → 14.86 |
+
+With the scalar validator forced, the every-second-byte case took 37.66 →
+30.08 µs (GCC) and 41.91 → 32.72 µs (Clang). Clang scalar's invalid-tail
+group regressed from 11.73 to 12.83 µs. All-invalid runs still use the
+existing batch operation, and clean inputs bypass replacement copying.

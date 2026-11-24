@@ -78,7 +78,7 @@ end
 local repair = checkutf8.repair
 for _, count in ipairs({1, 2, 3, 31, 1025, 8193}) do
 	local input = "中\0" .. ("\x80"):rep(count) .. "🙂\xffend"
-	for _, replacement in ipairs({"", "?", "\0", "a\0中", ("ab"):rep(128)}) do
+	for _, replacement in ipairs({"", "?", "\0", "x\0y", "a\0中", ("ab"):rep(128)}) do
 		assert(repair(input, replacement) ==
 		       "中\0" .. replacement:rep(count) .. "🙂" .. replacement .. "end")
 	end

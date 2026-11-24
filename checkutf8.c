@@ -249,7 +249,11 @@ append_repaired(lua_State *l, luaL_Buffer *buff, const char *s, size_t valid,
 	memcpy(out, s, valid);
 	out += valid;
 	if (count == 1) {
-		memcpy(out, replacement, width);
+		/* U+FFFD is three bytes; a fixed-size copy can be inlined. */
+		if (width == 3)
+			memcpy(out, replacement, 3);
+		else
+			memcpy(out, replacement, width);
 	} else if (width == 1) {
 		memset(out, (unsigned char)*replacement, bytes);
 	} else if (width) {
