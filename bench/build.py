@@ -116,11 +116,11 @@ def fnv32(data):
     return value
 
 
-def build(dest):
+def build(dest, corpus=None):
     dest.mkdir(parents=True, exist_ok=True)
     with (dest / "inputs.bin").open("wb") as blob, (dest / "index.tsv").open("wb") as index:
         index.write(b"group\toffset\tbytes\tfirst_error\trepair_fnv32\n")
-        for group, records in groups():
+        for group, records in (groups() if corpus is None else corpus):
             for raw in records:
                 first, repaired = oracle(raw)
                 line = f"{group}\t{blob.tell()}\t{len(raw)}\t{first}\t{fnv32(repaired):08x}\n"

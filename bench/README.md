@@ -64,3 +64,35 @@ checksums. The existing whole-file driver can scan it directly:
 python3 bench/build.py /tmp/checkutf8-v1 --stream-mib 576
 ITERATIONS=7 lua benchmark.lua /tmp/checkutf8-v1/stream-576MiB.txt
 ```
+
+## Traditional Chinese fiction supplement
+
+The upstream benchmark lists a 2.5 MiB Traditional Chinese plaintext copy
+of *Dream of the Red Chamber*. Its exact edition and checksum are unspecified.
+This independent supplement uses Cao Xueqin's *紅樓夢*, digitized by Wei-yi Kao,
+Project Gutenberg ebook 24264, updated 2021-12-22.
+[Source edition](https://www.gutenberg.org/ebooks/24264)
+
+The 851 calls cover six exact lengths (1, 4, 16, 64, 256 and 1,024 Unicode
+code points, one excerpt per chapter at the same anchor for each length),
+118 indented paragraphs, 12 whole chapters spaced from chapter 1 to 120,
+and the entire 2,615,302-byte novel. The two chapters without a matching
+indented paragraph remain in the length sweep and full book. The body
+runs from the first chapter heading to the end marker, with LF line endings
+and one final newline. Internal hard wraps, punctuation and spaces are preserved.
+
+Run all nine lengths and groupings offline from the checkout:
+
+```sh
+lua bench/replay.lua validate bench/red-chamber-v1
+lua bench/replay.lua repair bench/red-chamber-v1 red-chamber-book
+```
+
+To rebuild from the pinned public archive, the builder checks the input SHA-256
+before extracting the book:
+
+```sh
+curl -fL https://www.mirrorservice.org/sites/ftp.ibiblio.org/pub/docs/books/gutenberg/2/4/2/6/24264/24264-0.txt -o /tmp/24264-0.txt
+python3 bench/build_red_chamber.py /tmp/24264-0.txt /tmp/red-chamber-v1
+cmp bench/red-chamber-v1/inputs.bin /tmp/red-chamber-v1/inputs.bin
+```
