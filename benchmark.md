@@ -71,3 +71,23 @@ The test machine supports AVX-512BW.
 
 Scanning one 576 MiB string, `("中文段落"):rep(48 * 1024^2)`, yielded
 11.50 GiB/s with runtime dispatch (median of seven rounds).
+
+### Aligned loads and the AVX-512VBMI path
+
+Comparison with commit `71eee70` on the same Xeon, Lua 5.4.6 and Clang 18
+at `-O2`. Both modules ran in one process pinned to core 4. Each value is the
+median of nine rounds of `validate` calls through Lua. Small buffers were
+reused across calls. All figures below are GiB/s.
+
+| Input | Previous | New |
+| --- | ---: | ---: |
+| `("微风吹过湖面，我们沿着山路慢慢往上走。"):rep(3300)` | 22.17 | 101.36 |
+| `(("中"):rep(315) .. "\n"):rep(200)` | 22.46 | 35.26 |
+| `("今天检查了 API 请求，发现 worker 在读完 JSON 后多等了 20 ms。"):rep(1500)` | 22.36 | 26.33 |
+| `("function hello() return true end\n"):rep(3000)` | 73.98 | 122.57 |
+| `("中文段落"):rep(48 * 1024^2)` (576 MiB) | 10.72 | 14.18 |
+| `("Aλ中🌙"):rep(math.floor(576 * 1024^2 / 10))` (about 576 MiB) | 8.09 | 8.90 |
+
+For 192 bytes of Chinese, the median call time was 31.99 ns before and 32.14 ns
+after. With AVX2 forced on this Xeon, the long Chinese sample went from 17.37
+to 17.82 GiB/s and the ASCII sample from 66.15 to 98.29 GiB/s.

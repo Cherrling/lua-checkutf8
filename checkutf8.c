@@ -145,6 +145,11 @@ static const unsigned char curr_high[16] = {
 #define VECTOR_BYTES 64
 #include "checkutf8-wide.h"
 #undef VECTOR_BYTES
+#define VECTOR_BYTES 64
+#define USE_VBMI
+#include "checkutf8-wide.h"
+#undef USE_VBMI
+#undef VECTOR_BYTES
 #endif
 
 #if defined(HAVE_WIDE_UTF8) && !defined(__clang__)
@@ -180,7 +185,9 @@ utf8_validate(const char *str, size_t len)
 		size_t prefix = utf8_validate_blocks(str, 16);
 		if (!prefix)
 			return utf8_validate_checked(str, len);
-		if (len >= 512 && __builtin_cpu_supports("avx512bw"))
+		if (len >= 512 && __builtin_cpu_supports("avx512vbmi") && __builtin_cpu_supports("avx512bw"))
+			prefix = utf8_validate_vbmi(str, len, prefix);
+		else if (len >= 512 && __builtin_cpu_supports("avx512bw"))
 			prefix = utf8_validate_avx512(str, len, prefix);
 		else
 			prefix = utf8_validate_avx2(str, len, prefix);

@@ -45,7 +45,8 @@ Standard, but the Unicode Standard doesn't require such behavior.
 ## Performance
 
 On x86 with a compatible GCC or Clang build, long strings use AVX2 or
-AVX-512BW when available at runtime. Short strings and other targets use the
+AVX-512BW when available at runtime. CPUs with AVX-512VBMI also accelerate
+runs of common three-byte characters. Short strings and other targets use the
 SSE2 or scalar validator. The default build needs no CPU-specific flags.
 
 See [benchmark.md](./benchmark.md) for measurements.

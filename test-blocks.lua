@@ -46,3 +46,19 @@ for offset = 0, 255 do
 		end
 	end
 end
+
+-- Exercise long regular triples, including the character crossing a vector
+-- boundary, and transitions to ASCII, restricted leads and four-byte text.
+local run = ("中文。"):rep(256)
+for prefix = 0, 63 do
+	local pad = ("x"):rep(prefix)
+	for _, middle in ipairs({
+		"\0", "🙂", "\xe0\xa0\x80", "\xed\x9f\xbf",
+		"\xe0\x9f\xbf", "\xed\xa0\x80", "\xf4\x90\x80\x80", "\xff",
+	}) do
+		check(pad .. run .. middle .. run)
+	end
+	for tail = 1, 3 do
+		check(pad .. run:sub(1, #run - tail))
+	end
+end
