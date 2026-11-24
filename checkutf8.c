@@ -11,86 +11,26 @@
 #include <lua.h>
 #include <lauxlib.h>
 
-/*
- * Some futher optimizations
- * - Replace logical operators with bitwise ones, to eliminate some branches
- *   - Probably won't improve things much since these branches are easy to
- *     predict
- * - Remove extra boundary checks in the loop by ensuring accessing at most
- *   three bytes past the memory boundary is OK.
- * - Add a fast path to process likely ASCII stuff in batch, utilizing the full
- *   machine register (4/8 bytes).
- */
+#define UTF8_VALIDATE utf8_validate_fast
+#include "checkutf8-impl.h"
 
-// Trailing bytes are in range [0x80, 0xbf], or [0b1000, 0b1011], i.e. their
-// most significant two bits must be 0b10.
-#define valid_trailer(c)	(((c) & 0xc0) == 0x80)
+#undef UTF8_VALIDATE
+#define BOUNDARY_CHECK
+#define UTF8_VALIDATE utf8_validate_checked
+#include "checkutf8-impl.h"
 
 static size_t
 utf8_validate(const char *str, size_t len)
 {
-	const uint8_t *p = (const uint8_t *)str;
-	size_t i = 0;
+	size_t err = 0;
 
-	while (i < len) {
-		if (p[i] <= 0x7f) {
-			/* [00, 7f] */
-			i++;
-		} else if (p[i] >= 0xc2 && p[i] <= 0xdf) {
-			/* [c2 - df] [80 - bf] */
-			if (len - i < 2)
-				return i;
-
-			if (!valid_trailer(p[i + 1]))
-				return i;
-
-			i += 2;
-		} else if (p[i] >= 0xe0 && p[i] <= 0xef) {
-			/*
-			 * [e0]     [a0, bf] [80, bf]
-			 * [e1, ec] [80, bf] [80, bf]
-			 * [ed]     [80, 9f] [80, bf]
-			 * [ee, ef] [80, bf] [80, bf]
-			 */
-			if (len - i < 3)
-				return i;
-
-			if (!valid_trailer(p[i + 1]) ||
-			    !valid_trailer(p[i + 2]))
-				return i;
-
-			// For sequences starting with 0xe0 and 0xed
-			if ((p[i] == 0xe0 && p[i + 1] < 0xa0) ||
-			    (p[i] == 0xed && p[i + 1] > 0x9f))
-				return i;
-
-			i += 3;
-		} else if (p[i] >= 0xf0 && p[i] <= 0xf4) {
-			/*
-			 * [f0]     [90, bf] [80, bf] [80, bf]
-			 * [f1, f3] [80, bf] [80, bf] [80, bf]
-			 * [f4]     [80, 8f] [80, bf] [80, bf]
-			 */
-			if (len - i < 4)
-				return i;
-
-			if (!valid_trailer(p[i + 1]) ||
-			    !valid_trailer(p[i + 2]) ||
-			    !valid_trailer(p[i + 3]))
-				return i;
-
-			// For sequences starting with 0xf0 and 0xf4
-			if ((p[i] == 0xf0 && p[i + 1] < 0x90) ||
-			    (p[i] == 0xf4 && p[i + 1] > 0x8f))
-				return i;
-
-			i += 4;
-		} else {
-			return i;
-		}
+	if (len > 4) {
+		err = utf8_validate_fast(str, len - 4);
+		str += err;
+		len -= err;
 	}
 
-	return i;
+	return err + utf8_validate_checked(str, len);
 }
 
 static int

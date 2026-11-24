@@ -4,8 +4,9 @@ A simple Lua module for validating and repairing UTF-8 sequences.
 
 ## Installation
 
-This module consists of only one C file, `checkutf8.c`, which could either
-be built manually with a C compiler, or through luarocks.
+This module consists of one C file, `checkutf8.c`, and a C header,
+`checkutf8-impl.h`. It could be built manually with a C compiler, or through
+luarocks.
 
 lua-checkutf8 requires Lua 5.3 or later, and is only tested with Lua 5.4 and Lua
 5.5.
