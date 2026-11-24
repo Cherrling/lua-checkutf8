@@ -94,3 +94,24 @@ reused across calls. All figures below are GiB/s.
 For 192 bytes of Chinese, the median call time was 31.99 ns before and 32.14 ns
 after. With AVX2 forced on this Xeon, the long Chinese sample went from 17.37
 to 17.82 GiB/s and the ASCII sample from 66.15 to 98.29 GiB/s.
+
+### Short inputs with AVX-512VBMI
+
+Lua 5.4.6 on Xeon 6966P-C, core 4, Clang 18 at `-O2`. The baseline is
+`a4769f5`. Each group replays the fixed samples in corpus order through
+`validate`, with both modules loaded and nine interleaved timing rounds.
+Times are median ns per Lua call including loop overhead.
+
+| Corpus group | Previous | Short-block path |
+| --- | ---: | ---: |
+| red-chamber-4cp | 24.66 | 19.22 |
+| red-chamber-16cp | 32.20 | 19.24 |
+| red-chamber-64cp | 34.58 | 25.04 |
+| red-chamber-256cp | 60.42 | 60.14 |
+| agent-session | 30.78 | 22.58 |
+| text-deltas | 22.06 | 22.85 |
+| raw-byte-chunks | 23.48 | 20.86 |
+| tool-log-replay | 27.59 | 22.62 |
+
+The dedicated path handles 5 through 511 bytes on CPUs supporting AVX-512BW
+and VBMI. Whole-book validation took 134.8 µs before and 134.0 µs after.

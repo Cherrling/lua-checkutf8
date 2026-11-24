@@ -62,3 +62,14 @@ for prefix = 0, 63 do
 		check(pad .. run:sub(1, #run - tail))
 	end
 end
+
+-- Exercise all short-block tail masks, including an incomplete character
+-- in the last active lane and a bad second byte after a full vector.
+for len = 0, 513 do
+	local ch = "中🙂"
+	local s = ch:rep(len // #ch) .. ("a"):rep(len % #ch)
+	check(s)
+	for _, ending in ipairs({"\xc2", "\xe0\xa0", "\xf4\x8f\xbf", "\xed\xa0\x80"}) do
+		if len >= #ending then check(s:sub(1, len - #ending) .. ending) end
+	end
+end

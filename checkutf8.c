@@ -180,6 +180,18 @@ static size_t
 utf8_validate(const char *str, size_t len)
 {
 #ifdef HAVE_WIDE_UTF8
+	if (len) {
+		unsigned lead = (unsigned char)str[0];
+		if ((lead >= 0x80 && lead < 0xc2) || lead >= 0xf5)
+			return 0;
+	}
+	if (len >= 5 && len < 512 && __builtin_cpu_supports("avx512vbmi") &&
+	    __builtin_cpu_supports("avx512bw")) {
+		size_t pos = short_valid_prefix(str, len);
+		if (pos == len)
+			return len;
+		return pos + utf8_validate_checked(str + pos, len - pos);
+	}
 	if (len >= 80 && __builtin_cpu_supports("avx2")) {
 		/* A checked prefix supplies lookbehind for the first wide block. */
 		size_t prefix = utf8_validate_blocks(str, 16);
@@ -197,11 +209,18 @@ utf8_validate(const char *str, size_t len)
 	return utf8_validate_narrow(str, len);
 }
 
+static inline const char *
+check_string(lua_State *l, size_t *len)
+{
+	const char *s = lua_tolstring(l, 1, len);
+	return s ? s : luaL_checklstring(l, 1, len);
+}
+
 static int
 checkutf8_validate(lua_State *l)
 {
 	size_t len;
-	const char *s = luaL_checklstring(l, 1, &len);
+	const char *s = check_string(l, &len);
 
 	size_t err = utf8_validate(s, len);
 
@@ -220,7 +239,7 @@ static int
 checkutf8_repair(lua_State *l)
 {
 	size_t len;
-	const char *s = luaL_checklstring(l, 1, &len);
+	const char *s = check_string(l, &len);
 
 	size_t replacementLen;
 	const char *replacement = luaL_optlstring(l, 2, "\xef\xbf\xbd",

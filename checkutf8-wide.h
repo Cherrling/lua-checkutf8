@@ -27,11 +27,8 @@
 #endif
 
 TARGET static inline V
-NAME(pair_errors)(const char *p, V current)
+NAME(byte_errors)(V current, V prev1, V prev2, V prev3)
 {
-	V prev1 = LOAD(p - 1);
-	V prev2 = LOAD(p - 2);
-	V prev3 = LOAD(p - 3);
 #ifdef USE_VBMI
 	/* VPERMB indexes modulo 64. Repeating each 16-entry table four
 	 * times makes the upper index bits irrelevant. */
@@ -52,7 +49,74 @@ NAME(pair_errors)(const char *p, V current)
 	return pairs ^ ((third | fourth) & OP(set1_epi8)((char)0x80));
 }
 
+TARGET static inline V
+NAME(pair_errors)(const char *p, V current)
+{
+	return NAME(byte_errors)(current, LOAD(p - 1), LOAD(p - 2), LOAD(p - 3));
+}
+
+
 #ifdef USE_VBMI
+/* Bytes before the first input byte act as ASCII. */
+TARGET static inline V
+first_byte_errors(V v)
+{
+	/* PALIGNR works within each 128-bit lane. Pair each lane with its
+	 * predecessor and supply zeros for bytes before the input. */
+	V previous = _mm512_alignr_epi32(v, _mm512_setzero_si512(), 12);
+	V a = _mm512_alignr_epi8(v, previous, 15);
+	V b = _mm512_alignr_epi8(v, previous, 14);
+	V c = _mm512_alignr_epi8(v, previous, 13);
+	return NAME(byte_errors)(v, a, b, c);
+}
+
+/* Return len on success, or a verified character boundary immediately
+ * before the first failed pair check for scalar error reporting. */
+TARGET static size_t
+short_valid_prefix(const char *str, size_t len)
+{
+	size_t i = 0;
+	V errors;
+	if (len < 64) {
+		V v = _mm512_maskz_loadu_epi8((UINT64_C(1) << len) - 1, str);
+		if (!HIGH(v))
+			return len;
+		errors = first_byte_errors(v);
+	} else {
+		errors = first_byte_errors(LOAD(str));
+		for (;;) {
+			if (ANY(errors))
+				goto failed_pair;
+			i += 64;
+			if (len - i < 64)
+				break;
+			errors = NAME(pair_errors)(str + i, LOAD(str + i));
+		}
+
+		/* Right-pad all four windows with zeros at the same end address.
+		 * A missing continuation then fails against a virtual ASCII byte. */
+		const char *p = str + i;
+		uint64_t live = (UINT64_C(1) << (len - i)) - 1;
+		V v = _mm512_maskz_loadu_epi8(live, p);
+		V a = _mm512_maskz_loadu_epi8((live << 1) | 1, p - 1);
+		V b = _mm512_maskz_loadu_epi8((live << 2) | 3, p - 2);
+		V c = _mm512_maskz_loadu_epi8((live << 3) | 7, p - 3);
+		errors = NAME(byte_errors)(v, a, b, c);
+	}
+	if (!ANY(errors))
+		return len;
+
+failed_pair:
+	i += __builtin_ctzll(_mm512_test_epi8_mask(errors, errors));
+	/* A bad successor can implicate its preceding lead. */
+	if (i) {
+		do {
+			i--;
+		} while (i && ((unsigned char)str[i] & 0xc0) == 0x80);
+	}
+	return i;
+}
+
 TARGET __attribute__((noinline)) static size_t
 regular_three_byte_prefix(const char *s, size_t n, unsigned phase)
 {
