@@ -73,3 +73,18 @@ for len = 0, 513 do
 		if len >= #ending then check(s:sub(1, len - #ending) .. ending) end
 	end
 end
+
+-- Consecutive invalid bytes may grow the output across Lua buffer boundaries.
+local repair = checkutf8.repair
+for _, count in ipairs({1, 2, 3, 31, 1025, 8193}) do
+	local input = "中\0" .. ("\x80"):rep(count) .. "🙂\xffend"
+	for _, replacement in ipairs({"", "?", "\0", "a\0中", ("ab"):rep(128)}) do
+		assert(repair(input, replacement) ==
+		       "中\0" .. replacement:rep(count) .. "🙂" .. replacement .. "end")
+	end
+	assert(repair(input) == repair(input, "�"))
+end
+assert(repair(123) == "123")
+assert(repair("\xff", 123) == "123")
+assert(repair("ok", nil, "extra") == "ok")
+assert(not pcall(repair, "ok", {}))

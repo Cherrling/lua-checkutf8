@@ -235,19 +235,52 @@ checkutf8_validate(lua_State *l)
 	return 2;
 }
 
+/* Append a valid span and the replacements that follow it in one reservation. */
+static void
+append_repaired(lua_State *l, luaL_Buffer *buff, const char *s, size_t valid,
+                const char *replacement, size_t width, size_t count)
+{
+	if (count > 1 && width > (SIZE_MAX - valid) / count)
+		luaL_error(l, "replacement string too large");
+	size_t bytes = count * width;
+	if (bytes > SIZE_MAX - valid)
+		luaL_error(l, "replacement string too large");
+	char *out = luaL_prepbuffsize(buff, valid + bytes);
+	memcpy(out, s, valid);
+	out += valid;
+	if (count == 1) {
+		memcpy(out, replacement, width);
+	} else if (width == 1) {
+		memset(out, (unsigned char)*replacement, bytes);
+	} else if (width) {
+		memcpy(out, replacement, width);
+		for (size_t used = width; used < bytes; ) {
+			size_t chunk = bytes - used;
+			if (chunk > used)
+				chunk = used;
+			memcpy(out + used, out, chunk);
+			used += chunk;
+		}
+	}
+	luaL_addsize(buff, valid + bytes);
+}
+
 static int
 checkutf8_repair(lua_State *l)
 {
 	size_t len;
 	const char *s = check_string(l, &len);
 
-	size_t replacementLen;
-	const char *replacement = luaL_optlstring(l, 2, "\xef\xbf\xbd",
-						  &replacementLen);
+	const char *replacement = "\xef\xbf\xbd";
+	size_t replacementLen = 3;
+	int single = lua_gettop(l) == 1;
+	if (!single)
+		replacement = luaL_optlstring(l, 2, replacement, &replacementLen);
 
 	size_t err = utf8_validate(s, len);
 	if (err == len) {
-		lua_settop(l, 1);
+		if (!single)
+			lua_settop(l, 1);
 		return 1;
 	}
 
@@ -255,21 +288,16 @@ checkutf8_repair(lua_State *l)
 	luaL_buffinit(l, &buff);
 
 	do {
-		if (err)
-			luaL_addlstring(&buff, s, err);
-		luaL_addlstring(&buff, replacement, replacementLen);
-		len -= err + 1;
-		s += err + 1;
-
-		/* Skip validation for bytes that cannot start a character. */
-		while (len) {
-			unsigned char lead = (unsigned char)*s;
+		size_t count = 1;
+		while (count < len - err) {
+			unsigned char lead = (unsigned char)s[err + count];
 			if (lead < 0x80 || (lead >= 0xc2 && lead <= 0xf4))
 				break;
-			luaL_addlstring(&buff, replacement, replacementLen);
-			s++;
-			len--;
+			count++;
 		}
+		append_repaired(l, &buff, s, err, replacement, replacementLen, count);
+		s += err + count;
+		len -= err + count;
 		/* Nearby errors are common in damaged input. A short probe also
 		 * avoids wide-vector setup for every replacement. The final three
 		 * bytes of the probe can contain a truncated valid character. */

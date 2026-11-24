@@ -115,3 +115,25 @@ Times are median ns per Lua call including loop overhead.
 
 The dedicated path handles 5 through 511 bytes on CPUs supporting AVX-512BW
 and VBMI. Whole-book validation took 134.8 µs before and 134.0 µs after.
+
+### Portable repair batching
+
+Baseline `64fa0bc`, Lua 5.4 on Xeon 6966P-C, core 4. Both modules ran the same
+fixed samples in one process with the default replacement. Values are median
+ns per Lua `repair` call over seven interleaved rounds, including loop overhead.
+
+| Corpus group | Clang -O2 before | After | GCC -O2 before | After |
+| --- | ---: | ---: | ---: | ---: |
+| agent-session | 26.8 | 22.6 | 27.0 | 24.0 |
+| text-deltas | 28.5 | 22.4 | 27.3 | 23.9 |
+| raw-byte-chunks | 59.8 | 55.7 | 59.2 | 56.1 |
+| red-chamber-16cp | 24.1 | 19.6 | 23.4 | 20.1 |
+| red-chamber-book | 133969 | 133750 | 150469 | 150313 |
+| corruption-density, all 8192 bytes invalid | 36273 | 4320 | 36656 | 4305 |
+| corruption-density, every second byte invalid | 55023 | 44219 | 58766 | 41711 |
+| binary | 22266 | 17598 | 21566 | 17395 |
+
+For the all-invalid case, forcing the scalar validator on the same CPU reduced
+repair time from 36.5 to 4.34 µs with Clang and from 36.4 to 4.34 µs with GCC.
+GCC scalar showed regressions for agent-session (90.7 to 96.0 ns), invalid-tail
+(11.2 to 13.3 µs) and one error per 1024 bytes (5.99 to 7.20 µs).
