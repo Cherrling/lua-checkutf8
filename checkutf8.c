@@ -24,7 +24,8 @@ utf8_validate(const char *str, size_t len)
 {
 	size_t err = 0;
 
-	if (len > 4) {
+	/* Short inputs fit in one pass through the checked loop. */
+	if (len >= 16) {
 		err = utf8_validate_fast(str, len - 4);
 		str += err;
 		len -= err;
