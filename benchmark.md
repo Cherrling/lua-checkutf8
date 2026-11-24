@@ -18,10 +18,10 @@ For Linux's documentation, my blog, and Transky, the testing text is constructed
 by `cat` them together.
 
 `checkutf8.so` is built with Clang 21.1.8 with `-O2` optimization flags.
+`benchmark.lua` is invoked with environment variable `ITERATIONS=512`.
 
 ## Testing Platforms
 
-- AMD Ryzen 9950X @ 5000MHz - 5700MHz, DDR5 5600MT/s
 - Intel Core i5-7300U @ 2700MHz, LPDDR3 1866MT/s
 - ARM Cortex-A53 @ 2016MHz on AMLogic A311D, LPDDR4
 - ARM Cortex-A73 @ 2208MHz on AMLogic A311D, LPDDR4
@@ -32,27 +32,24 @@ by `cat` them together.
 
 ### Throughput (MiB/s)
 
-| Text                                     | 9950X | 7300U | A53 | A73 | C920 | LA464 |
-|------------------------------------------|-------|-------|-----|-----|------|-------|
-| Dream of the Red Chamber                 | 2445  | 1108  | 249 | 412 | 416  | 743   |
-| Linux v7.3 Documentation (ja_JP)         | 2267  | 890   | 252 | 413 | 418  | 712   |
-| Linux v7.3 Documentation (zh_CN)         | 1914  | 927   | 250 | 412 | 419  | 675   |
-| My Blog                                  | 2692  | 948   | 262 | 436 | 444  | 713   |
-| Pride and Prejudice                      | 3895  | 1426  | 307 | 580 | 609  | 1026  |
-| The Miracles of the Namiya General Store | 2676  | 1213  | 255 | 428 | 432  | 779   |
-| Transky                                  | 2533  | 1209  | 253 | 424 | 428  | 774   |
+| Text                                     | 7300U | A53 | A73 | C920 | LA464 |
+|------------------------------------------|-------|-----|-----|------|-------|
+| Dream of the Red Chamber                 | 1213  | 260 | 453 | 445  | 827   |
+| Linux v7.3 Documentation (ja_JP)         | 1070  | 262 | 446 | 427  | 773   |
+| Linux v7.3 Documentation (zh_CN)         | 1045  | 257 | 438 | 411  | 732   |
+| My Blog                                  | 1111  | 269 | 459 | 419  | 775   |
+| Pride and Prejudice                      | 2290  | 308 | 581 | 463  | 1074  |
+| The Miracles of the Namiya General Store | 1353  | 268 | 474 | 466  | 874   |
+| Transky                                  | 1307  | 267 | 469 | 461  | 860   |
 
 ### Throughput per MHz (MiB/s/MHz)
 
-The AMD Ryzen 9950X column uses 5350 MHz, the midpoint of its 5000–5700 MHz
-clock range.
-
-| Text                                     | 9950X | 7300U | A53   | A73   | C920  | LA464 |
-|------------------------------------------|-------|-------|-------|-------|-------|-------|
-| Dream of the Red Chamber                 | 0.457 | 0.410 | 0.123 | 0.187 | 0.208 | 0.297 |
-| Linux v7.3 Documentation (ja_JP)         | 0.424 | 0.329 | 0.125 | 0.187 | 0.209 | 0.285 |
-| Linux v7.3 Documentation (zh_CN)         | 0.358 | 0.343 | 0.124 | 0.187 | 0.210 | 0.270 |
-| My Blog                                  | 0.503 | 0.351 | 0.130 | 0.198 | 0.222 | 0.285 |
-| Pride and Prejudice                      | 0.728 | 0.528 | 0.153 | 0.263 | 0.304 | 0.411 |
-| The Miracles of the Namiya General Store | 0.500 | 0.449 | 0.127 | 0.194 | 0.216 | 0.312 |
-| Transky                                  | 0.474 | 0.448 | 0.125 | 0.192 | 0.214 | 0.310 |
+| Text                                     | 7300U | A53   | A73   | C920  | LA464 |
+|------------------------------------------|-------|-------|-------|-------|-------|
+| Dream of the Red Chamber                 | 0.449 | 0.129 | 0.205 | 0.223 | 0.331 |
+| Linux v7.3 Documentation (ja_JP)         | 0.396 | 0.130 | 0.202 | 0.214 | 0.309 |
+| Linux v7.3 Documentation (zh_CN)         | 0.387 | 0.127 | 0.198 | 0.205 | 0.293 |
+| My Blog                                  | 0.412 | 0.133 | 0.208 | 0.209 | 0.310 |
+| Pride and Prejudice                      | 0.848 | 0.153 | 0.263 | 0.232 | 0.430 |
+| The Miracles of the Namiya General Store | 0.501 | 0.133 | 0.215 | 0.233 | 0.350 |
+| Transky                                  | 0.484 | 0.132 | 0.212 | 0.230 | 0.344 |
