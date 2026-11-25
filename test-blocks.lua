@@ -88,3 +88,15 @@ assert(repair(123) == "123")
 assert(repair("\xff", 123) == "123")
 assert(repair("ok", nil, "extra") == "ok")
 assert(not pcall(repair, "ok", {}))
+
+-- Refill the repair buffer across many separate errors, then append a long
+-- valid span and a multibyte tail. Also exercise an oversized single write.
+local span = ("文"):rep(4000)
+for _, n in ipairs({255, 1024, 8191, 8192, 8193}) do
+	local input = ("a\xff"):rep(n) .. span .. "\xff终"
+	for _, repl in ipairs({"", "?", "x\0y"}) do
+		assert(repair(input, repl) == ("a" .. repl):rep(n) .. span .. repl .. "终")
+	end
+end
+local large = ("\0a"):rep(8193)
+assert(repair("\xff好\xff", large) == large .. "好" .. large)

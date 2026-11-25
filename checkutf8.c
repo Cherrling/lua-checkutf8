@@ -235,9 +235,16 @@ checkutf8_validate(lua_State *l)
 	return 2;
 }
 
-/* Append a valid span and the replacements that follow it in one reservation. */
+/* Keep a Lua buffer reservation across nearby repairs. Commit its used
+ * prefix before asking Lua for another reservation or appending the tail. */
+struct repair_buffer {
+	luaL_Buffer lua;
+	char *end;
+	size_t capacity, remaining;
+};
+
 static void
-append_repaired(lua_State *l, luaL_Buffer *buff, const char *s, size_t valid,
+append_repaired(lua_State *l, struct repair_buffer *buff, const char *s, size_t valid,
                 const char *replacement, size_t width, size_t count)
 {
 	if (count > 1 && width > (SIZE_MAX - valid) / count)
@@ -245,7 +252,14 @@ append_repaired(lua_State *l, luaL_Buffer *buff, const char *s, size_t valid,
 	size_t bytes = count * width;
 	if (bytes > SIZE_MAX - valid)
 		luaL_error(l, "replacement string too large");
-	char *out = luaL_prepbuffsize(buff, valid + bytes);
+	size_t needed = valid + bytes;
+	if (needed > buff->remaining) {
+		luaL_addsize(&buff->lua, buff->capacity - buff->remaining);
+		buff->capacity = needed > LUAL_BUFFERSIZE ? needed : LUAL_BUFFERSIZE;
+		buff->end = luaL_prepbuffsize(&buff->lua, buff->capacity) + buff->capacity;
+		buff->remaining = buff->capacity;
+	}
+	char *out = buff->end - buff->remaining;
 	memcpy(out, s, valid);
 	out += valid;
 	if (count == 1) {
@@ -266,7 +280,7 @@ append_repaired(lua_State *l, luaL_Buffer *buff, const char *s, size_t valid,
 			used += chunk;
 		}
 	}
-	luaL_addsize(buff, valid + bytes);
+	buff->remaining -= needed;
 }
 
 static int
@@ -288,8 +302,10 @@ checkutf8_repair(lua_State *l)
 		return 1;
 	}
 
-	luaL_Buffer buff;
-	luaL_buffinit(l, &buff);
+	struct repair_buffer buff;
+	buff.capacity = LUAL_BUFFERSIZE;
+	buff.remaining = buff.capacity;
+	buff.end = luaL_buffinitsize(l, &buff.lua, buff.capacity) + buff.capacity;
 
 	do {
 		size_t count = 1;
@@ -314,9 +330,10 @@ checkutf8_repair(lua_State *l)
 			err = utf8_validate(s, len);
 		}
 	} while (err < len);
-	luaL_addlstring(&buff, s, len);
+	luaL_addsize(&buff.lua, buff.capacity - buff.remaining);
+	luaL_addlstring(&buff.lua, s, len);
 
-	luaL_pushresult(&buff);
+	luaL_pushresult(&buff.lua);
 
 	return 1;
 }

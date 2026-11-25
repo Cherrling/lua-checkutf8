@@ -155,3 +155,21 @@ With the scalar validator forced, the every-second-byte case took 37.66 →
 30.08 µs (GCC) and 41.91 → 32.72 µs (Clang). Clang scalar's invalid-tail
 group regressed from 11.73 to 12.83 µs. All-invalid runs still use the
 existing batch operation, and clean inputs bypass replacement copying.
+
+### Reusing Lua buffer reservations across repairs
+
+Compared with `cc52ada` on Xeon 6966P-C, core 4, Lua 5.4.6, default CPU
+dispatch, `-O2`. Both modules ran in the same Lua process. Values are median
+µs per `repair` call over seven interleaved rounds with the default replacement.
+
+| Input | GCC 13 before → after | Clang 18 before → after |
+| --- | ---: | ---: |
+| Every second byte invalid, 8192 bytes | 36.36 → 31.52 | 33.79 → 27.68 |
+| Every 13th byte invalid, 8190 bytes | 11.15 → 9.98 | 8.96 → 7.58 |
+| All 8192 bytes invalid | 4.49 → 4.48 | 4.35 → 4.36 |
+| Binary corpus | 16.09 → 16.44 | 13.70 → 14.41 |
+| Red Chamber full book | 151.00 → 150.94 | 134.53 → 133.81 |
+
+With the scalar validator forced, the every-second-byte case took 31.77 →
+25.00 µs (GCC) and 32.67 → 29.32 µs (Clang). On the same input, an empty,
+one-byte or 17-byte replacement also reduced elapsed time with both compilers.
