@@ -209,6 +209,14 @@ utf8_validate(const char *str, size_t len)
 	return utf8_validate_narrow(str, len);
 }
 
+static inline size_t
+validate_string(const char *str, size_t len)
+{
+	if (len <= 1)
+		return len && (unsigned char)str[0] < 0x80;
+	return utf8_validate(str, len);
+}
+
 static inline const char *
 check_string(lua_State *l, size_t *len)
 {
@@ -222,7 +230,7 @@ checkutf8_validate(lua_State *l)
 	size_t len;
 	const char *s = check_string(l, &len);
 
-	size_t err = utf8_validate(s, len);
+	size_t err = validate_string(s, len);
 
 	if (err == len) {
 		lua_pushboolean(l, 1);
@@ -295,10 +303,19 @@ checkutf8_repair(lua_State *l)
 	if (!single)
 		replacement = luaL_optlstring(l, 2, replacement, &replacementLen);
 
-	size_t err = utf8_validate(s, len);
+	size_t err = validate_string(s, len);
 	if (err == len) {
 		if (!single)
 			lua_settop(l, 1);
+		return 1;
+	}
+
+	/* One invalid byte produces exactly the replacement string. */
+	if (len == 1) {
+		if (!single && !lua_isnil(l, 2))
+			lua_settop(l, 2);
+		else
+			lua_pushlstring(l, replacement, replacementLen);
 		return 1;
 	}
 

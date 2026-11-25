@@ -100,3 +100,18 @@ for _, n in ipairs({255, 1024, 8191, 8192, 8193}) do
 end
 local large = ("\0a"):rep(8193)
 assert(repair("\xff好\xff", large) == large .. "好" .. large)
+
+-- A standalone non-ASCII byte always produces exactly one replacement.
+local custom = ("A\0文"):rep(512)
+for byte = 0, 255 do
+	local s = string.char(byte)
+	local valid, pos = checkutf8.validate(s)
+	assert(valid == (byte < 128))
+	assert(pos == (byte >= 128 and 1 or nil))
+	assert(repair(s) == (valid and s or "�"))
+	assert(repair(s, nil, false) == (valid and s or "�"))
+	assert(repair(s, "", false) == (valid and s or ""))
+	assert(repair(s, custom, false) == (valid and s or custom))
+	assert(repair(s, 42, false) == (valid and s or "42"))
+	assert(not pcall(repair, s, {}))
+end

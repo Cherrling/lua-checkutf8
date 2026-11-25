@@ -173,3 +173,22 @@ dispatch, `-O2`. Both modules ran in the same Lua process. Values are median
 With the scalar validator forced, the every-second-byte case took 31.77 →
 25.00 µs (GCC) and 32.67 → 29.32 µs (Clang). On the same input, an empty,
 one-byte or 17-byte replacement also reduced elapsed time with both compilers.
+
+### Standalone bytes at the Lua API boundary
+
+Compared with `5d9c5f6` on Xeon 6966P-C, core 4, Lua 5.4.6. Times are
+median ns per Lua call over seven interleaved rounds, with both modules
+compiled at `-O2`. The single-byte sweep calls each API once for each byte
+value in order. Half of those inputs require replacement. Repair uses U+FFFD.
+
+| Input and API | GCC 13 before → after | Clang 18 before → after |
+| --- | ---: | ---: |
+| Single-byte sweep, validate | 19.92 → 17.48 | 20.05 → 17.52 |
+| Single-byte sweep, repair | 29.29 → 21.45 | 29.74 → 21.83 |
+| Raw byte chunks, repair | 54.96 → 51.50 | 53.25 → 51.46 |
+| Whole v1 corpus, repair | 229.28 → 222.89 | 224.59 → 221.19 |
+| Red Chamber corpus, repair | 289.66 → 289.81 | 315.73 → 316.25 |
+
+On the binary group, Clang repair rose from 13.58 to 14.55 µs while GCC
+fell from 16.17 to 14.02 µs. Forced-scalar builds on the same machine also
+reduced single-byte repair time (GCC 29.58 → 21.48 ns, Clang 31.53 → 20.99 ns).
